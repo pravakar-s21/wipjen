@@ -1,70 +1,49 @@
 pipeline {
-  agent any
-  tools {
-    jdk 'Java17'
-    maven 'Maven'
-  }
-  stages {
-    stage('Checkout Code') {
-      steps {
-        echo 'Pulling from Github'
-        git branch: 'main', credentialsId: 'mygithubcred', url: 'https://github.com/chntraining/k8test.git'
-      }
+    agent any
+    tools {
+        jdk 'Java17'
+        maven 'Maven'
     }
-    stage('Test Code') {
-      steps {
-        echo 'JUNIT Test case execution started'
-        bat 'mvn clean test'
-        
-      }
-      post {
-        always {
-		  junit '**/target/surefire-reports/*.xml'
-          echo 'Test Run is SUCCESSFUL!'
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo 'Pulling from Github...'
+                checkout scm
+            }
         }
-
-      }
+        stage('Test Code') {
+            steps {
+                echo 'JUNIT Test case execution started'
+                // Use 'sh' for Linux. The '-Dmaven.test.failure.ignore=true' 
+                // ensures the pipeline continues so JUnit can report the errors.
+                sh 'mvn test -Dmaven.test.failure.ignore=true'
+            }
+            post {
+                always {
+                    // allowEmptyResults: true prevents the "Configuration error" crash
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        stage('Build Project') {
+            steps {
+                echo 'Building the Maven Project...'
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+        stage('Build the Docker Image') {
+            steps {
+                echo 'Building Docker Image...'
+                // This assumes you have a Dockerfile in your repo
+                sh 'docker build -t indiaproj-app:${BUILD_NUMBER} .'
+            }
+        }
     }
-    stage('Build Project') {
-      steps {
-        echo 'Building Java project'
-        bat 'mvn clean package -DskipTests'
-      }
+    post {
+        success {
+            echo 'Build Successful!'
+        }
+        failure {
+            echo 'OOPS!!! Failure.'
+        }
     }
-    stage('Build the Docker Image') {
-      steps {
-        echo 'Building Docker Image'
-        bat 'docker build -t myindiaproj:1.0 .'
-      }
-    }
-    stage('Push Docker Image to DockerHub') {
-      steps {
-        echo 'Pushing  Docker Image'
-        withCredentials([string(credentialsId: 'dockerhubpwd', variable: 'DOCKER_PASS')]) {
-  	      bat '''
-          echo %DOCKER_PASS% | docker login -u deepikkaa20 --password-stdin
-          docker tag myjavaproj:1.0 deepikkaa20/myindiaproj:1.0
-          docker push deepikkaa20/myindiaproj:1.0
-          '''}
-      }
-    }
-    /*stage('Run Docker Container') {
-      steps {
-        echo 'Running Java Application'
-        bat '''
-        docker rm -f myjavaproj-container || exit 0
-        docker run --name myjavaproj-container myjavaproj:1.0
-        
-        '''               
-      }
-    }*/
-  }
-  post {
-    success {
-      echo 'BUild and Run is SUCCESSFUL!'
-    }
-    failure {
-      echo 'OOPS!!! Failure.'
-    }
-  }
-}
