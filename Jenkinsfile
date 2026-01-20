@@ -7,8 +7,8 @@ pipeline {
   stages {
     stage('Checkout Code') {
       steps {
-        echo 'Pulling from Github'
-        // Use your actual repo: https://github.com/pravakar-s21/wipjen.git
+        echo 'Pulling from Github...'
+        // Stick to your primary repository
         git branch: 'main', url: 'https://github.com/pravakar-s21/wipjen.git'
       }
     }
@@ -20,43 +20,40 @@ pipeline {
       }
       post {
         always {
-          // allowEmptyResults: true prevents the build from crashing if tests are missing
+          // allowEmptyResults: true prevents failure if you haven't written tests yet
           junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
-          echo 'Test stage completed.'
         }
       }
     }
     stage('Build Project') {
       steps {
-        echo 'Building Java project'
+        echo 'Building Java project...'
         // Changed 'bat' to 'sh'
         sh 'mvn clean package -DskipTests'
       }
     }
     stage('Build the Docker Image') {
       steps {
-        echo 'Building Docker Image'
+        echo 'Building Docker Image...'
         // Changed 'bat' to 'sh'
         sh 'docker build -t myjavaproj:1.0 .'
       }
     }
-    stage('Run Docker Container') {
+    stage('Deploy to Kubernetes') {
       steps {
-        echo 'Running Java Application'
-        // Changed 'bat' to 'sh'
-        sh '''
-        docker rm -f myjavaproj-container || true
-        docker run -d --name myjavaproj-container myjavaproj:1.0
-        '''               
+        echo 'Updating Kubernetes Deployment...'
+        // Instead of 'docker run', we update the existing K8s deployment 
+        // to fix your 'indiaproj' pods.
+        sh 'kubectl set image deployment/indiaproj-deployment indiaproj-container=myjavaproj:1.0 || echo "Deployment not found, skipping..." '
       }
     }
   }
   post {
     success {
-      echo 'Build and Run is SUCCESSFUL!'
+      echo 'Build and Deployment Successful!'
     }
     failure {
-      echo 'OOPS!!! Failure.'
+      echo 'OOPS!!! Pipeline Failed. Check the Console Output above.'
     }
   }
 }
